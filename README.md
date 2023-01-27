@@ -1,38 +1,94 @@
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
+Modified to work with [Shiki](https://github.com/shikijs/shiki).
+
 ## Getting Started
 
 First, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). You should see
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+![Shiki Safari](./screenshots/shiki-safari.png)
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+## Diffs
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+Refer to this commit for full diff: [b2639c7](https://github.com/shikijs/next-shiki/commit/b2639c704c0e2eab91c55c08a0419e6b502229eb).
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Notably, you need to set `serverComponentsExternalPackages` in `next.config.js`
 
-## Learn More
+```diff
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
++  experimental: {
++    serverComponentsExternalPackages: ['shiki', 'vscode-oniguruma']
++  }
+}
 
-To learn more about Next.js, take a look at the following resources:
+module.exports = nextConfig
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`lib/shiki.ts`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```ts
+import type { Highlighter, Lang, Theme } from 'shiki'
+import { renderToHtml, getHighlighter } from 'shiki'
 
-## Deploy on Vercel
+let highlighter: Highlighter
+export async function highlight(code: string, theme: Theme, lang: Lang) {
+  if (!highlighter) {
+    highlighter = await getHighlighter({
+      langs: [lang],
+      theme: theme
+    })
+  }
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+  const tokens = highlighter.codeToThemedTokens(code, lang, theme, {
+    includeExplanation: false
+  })
+  const html = renderToHtml(tokens, { bg: 'transparent' })
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+  return html
+}
+```
+
+`pages/index.tsx`
+
+```tsx
+interface Props {
+  highlightedHtml: string
+}
+
+export default function Home(props: Props) {
+  return (
+    <>
+      <div
+        dangerouslySetInnerHTML={{ __html: props.highlightedHtml }}
+        style={{ fontFamily: 'var(--font-mono)', fontSize: '2rem' }}
+      />
+    <>
+  )
+}
+
+export const getServerSideProps: GetServerSideProps<Props> = async () => {
+  const html = await highlight(
+    `console.log('hi next.js')`,
+    'github-dark',
+    'javascript'
+  )
+
+  return {
+    props: {
+      highlightedHtml: html
+    }
+  }
+}
+```
+
+## License
+
+MIT © [Pine Wu](https://github.com/octref)
